@@ -1,0 +1,52 @@
+Project: Smart Scheduler – Production-Ready Google Calendar Web App
+
+Objective:
+Create a polished web application named “Smart Scheduler” that integrates deeply with Google Calendar. It must enable users to authenticate via Google, view and manage their calendars and events seamlessly, and lay the foundation for intelligent scheduling features.
+
+Deliverables:
+
+1. **Google Cloud Setup:**
+   - Enable Google Calendar API.
+   - Configure OAuth Consent Screen (external/internal as needed).
+   - Create OAuth Client (Web), register JS origins and redirect URIs.
+   - Define and justify scopes: at minimum `calendar.readonly` and `calendar.events`.
+   - (If needed) Add test users for development.
+
+2. **Frontend Application:**
+   - Use React.js (or equivalent) for UI.
+   - Implement “Connect Google” and “Sign Out” flows using OAuth 2.0.
+   - Display a dashboard listing all user calendars and upcoming events.
+   - Support creation, editing, and deletion of events with appropriate UI modals/forms.
+   - Use FullCalendar.js or similar for interactive calendar views.
+
+3. **Calendar API Integration:**
+   - Use Google JavaScript client (`gapi.client`) or REST calls.
+   - Core operations:
+     - List calendars.
+     - Fetch upcoming events (limit to e.g., next 10).
+     - Create, update, delete events.
+     - Handle recurring events and reminders.
+   - (Optional) Set up push notifications or free/busy queries.
+
+4. **Optional Backend Support:**
+   - Node.js + Express service to securely handle tokens.
+   - Encapsulate API calls using Google client library.
+   - Support webhooks or scheduled sync tasks.
+
+5. **User Experience:**
+   - Responsive and user-friendly UI.
+   - Loading indicators and error feedback.
+   - Confirmation dialogues on destructive actions.
+
+6. **Documentation & Code Quality:**
+   - Follow modular coding standards.
+   - Secure credential management.
+   - README with setup, usage, extension guidance.
+
+Reference Materials:
+- JavaScript Quickstart guide for Google Calendar API — OAuth and event listing examples. :contentReference[oaicite:11]{index=11}
+- PublicAPIs Google Calendar examples for calendar listing and event operations. :contentReference[oaicite:12]{index=12}
+- Integration patterns and backend authentication samples. :contentReference[oaicite:13]{index=13}
+
+Goal:
+Deliver a robust, production-grade Smart Scheduler application with complete event management features, extensible architecture, and exceptional UI/UX.
