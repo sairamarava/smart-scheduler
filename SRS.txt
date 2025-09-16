@@ -1,52 +1,152 @@
-Project: Smart Scheduler – Production-Ready Google Calendar Web App
+Here’s a clean **Software Requirements Specification (SRS)** for your web app *CollegeDocs*:
 
-Objective:
-Create a polished web application named “Smart Scheduler” that integrates deeply with Google Calendar. It must enable users to authenticate via Google, view and manage their calendars and events seamlessly, and lay the foundation for intelligent scheduling features.
+---
 
-Deliverables:
+# Software Requirements Specification (SRS)
 
-1. **Google Cloud Setup:**
-   - Enable Google Calendar API.
-   - Configure OAuth Consent Screen (external/internal as needed).
-   - Create OAuth Client (Web), register JS origins and redirect URIs.
-   - Define and justify scopes: at minimum `calendar.readonly` and `calendar.events`.
-   - (If needed) Add test users for development.
+**Project Name:** CollegeDocs – A Minimalist PDF Sharing Platform for Students
+**Prepared by:** \[Your Name]
+**Date:** \[Insert Date]
 
-2. **Frontend Application:**
-   - Use React.js (or equivalent) for UI.
-   - Implement “Connect Google” and “Sign Out” flows using OAuth 2.0.
-   - Display a dashboard listing all user calendars and upcoming events.
-   - Support creation, editing, and deletion of events with appropriate UI modals/forms.
-   - Use FullCalendar.js or similar for interactive calendar views.
+---
 
-3. **Calendar API Integration:**
-   - Use Google JavaScript client (`gapi.client`) or REST calls.
-   - Core operations:
-     - List calendars.
-     - Fetch upcoming events (limit to e.g., next 10).
-     - Create, update, delete events.
-     - Handle recurring events and reminders.
-   - (Optional) Set up push notifications or free/busy queries.
+## 1. Introduction
 
-4. **Optional Backend Support:**
-   - Node.js + Express service to securely handle tokens.
-   - Encapsulate API calls using Google client library.
-   - Support webhooks or scheduled sync tasks.
+### 1.1 Purpose
 
-5. **User Experience:**
-   - Responsive and user-friendly UI.
-   - Loading indicators and error feedback.
-   - Confirmation dialogues on destructive actions.
+The purpose of this document is to define the functional and non-functional requirements for **CollegeDocs**, a web application designed for students to share and access PDF documents across different classes. The platform provides a simple, free, and minimalist environment for document exchange.
 
-6. **Documentation & Code Quality:**
-   - Follow modular coding standards.
-   - Secure credential management.
-   - README with setup, usage, extension guidance.
+### 1.2 Scope
 
-Reference Materials:
-- JavaScript Quickstart guide for Google Calendar API — OAuth and event listing examples. :contentReference[oaicite:11]{index=11}
-- PublicAPIs Google Calendar examples for calendar listing and event operations. :contentReference[oaicite:12]{index=12}
-- Integration patterns and backend authentication samples. :contentReference[oaicite:13]{index=13}
+CollegeDocs allows students to:
 
-Goal:
-Deliver a robust, production-grade Smart Scheduler application with complete event management features, extensible architecture, and exceptional UI/UX.
+* Create an account and log in securely.
+* Upload PDFs with metadata (file name, subject).
+* Search for PDFs by keywords or subject.
+* View and download a list of available PDFs.
+
+The application focuses on **simplicity** and **ease of use**, targeting college students who need a lightweight document-sharing platform without unnecessary complexity.
+
+---
+
+## 2. System Overview
+
+### 2.1 Users
+
+* **Students**: Primary users who can upload, search, and download PDFs.
+
+### 2.2 Modules
+
+1. **Authentication Module**
+
+   * User registration (basic info: name, email, password).
+   * Secure login/logout.
+
+2. **PDF Upload Module**
+
+   * Upload PDFs with required details: Title, Subject, Author (optional).
+   * Store file in server/cloud with metadata in database.
+
+3. **Search & Browse Module**
+
+   * Search by filename, subject, or keywords.
+   * Display results in a simple list view.
+
+4. **Download Module**
+
+   * Allow students to download PDFs directly.
+
+---
+
+## 3. Functional Requirements
+
+### 3.1 Authentication
+
+* Students must sign up with a valid email and password.
+* Passwords are stored securely (hashed).
+* Login and logout functionality must be available.
+
+### 3.2 PDF Upload
+
+* Users can upload a PDF (max size limit, e.g., 20MB).
+* Each PDF entry must include:
+
+  * Title (string, required)
+  * Subject (string, required)
+  * Uploaded By (auto from account)
+  * Date of Upload (auto)
+
+### 3.3 Search and Retrieval
+
+* Users can search PDFs by:
+
+  * Title
+  * Subject
+* The search results should be displayed in a list with:
+
+  * PDF Title
+  * Subject
+  * Uploader’s Name
+  * Download button
+
+### 3.4 Downloading
+
+* Any logged-in student can download available PDFs.
+
+---
+
+## 4. Non-Functional Requirements
+
+### 4.1 Performance
+
+* Search results should load in < 2 seconds.
+* Support at least 100 concurrent users.
+
+### 4.2 Security
+
+* Use HTTPS for all communication.
+* Store passwords with hashing and salting.
+* Only authenticated users can upload or download PDFs.
+
+### 4.3 Usability
+
+* Minimalist design with clear navigation.
+* Responsive design for desktop and mobile.
+* Simple interface, no unnecessary features.
+
+### 4.4 Scalability
+
+* System should be extendable to support new features (e.g., categories, comments).
+
+---
+
+## 5. Technology Stack (Proposed)
+
+* **Frontend**: React + Tailwind CSS
+* **Backend**: Node.js + Express
+* **Database**: MongoDB (for user and PDF metadata)
+* **File Storage**: Local server / Cloud storage (AWS S3 or similar)
+* **Authentication**: JWT-based authentication
+
+---
+
+## 6. Constraints
+
+* File size limitation (configurable, default: 20MB).
+* Only PDF format allowed.
+* Free usage with no premium features.
+
+---
+
+## 7. Future Enhancements (Optional)
+
+* PDF previews in browser.
+* Tags or categories for better search.
+* Rating or like system for popular documents.
+* Class/group-based sharing (restricted visibility).
+
+---
+
+✅ This keeps it **simple, student-friendly, and production-ready** while leaving room for scaling.
+
+Would you like me to also make a **UI wireframe flow (login → upload → search → download)** for CollegeDocs so you have a visual reference?
