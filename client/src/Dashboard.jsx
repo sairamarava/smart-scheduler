@@ -34,8 +34,19 @@ const Dashboard = ({ user }) => {
               className="p-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:from-blue-700 hover:to-purple-700 transition-all flex items-center"
               title="Logout"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                className="w-6 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"
+                />
               </svg>
             </motion.button>
           </div>
@@ -44,7 +55,8 @@ const Dashboard = ({ user }) => {
           Welcome, {user?.name || "User"}!
         </h1>
         <p className="text-lg text-gray-600 mb-8">
-          This is your dashboard. You can manage your schedule, view stats, and more features coming soon!
+          This is your dashboard. You can manage your schedule, view stats, and
+          more features coming soon!
         </p>
       </motion.div>
     </motion.div>

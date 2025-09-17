@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
@@ -10,7 +9,6 @@ import Register from "./Register";
 import Login from "./Login";
 import Landing from "./Landing";
 import Dashboard from "./Dashboard";
-
 
 function App() {
   // Dashboard route expects user info from location state

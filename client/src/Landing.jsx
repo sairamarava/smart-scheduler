@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -39,7 +38,8 @@ const Landing = () => {
           Welcome to Smart Scheduler!
         </h1>
         <p className="text-lg text-gray-600 mb-8">
-          You are now logged in. Explore features, manage your schedule, and enjoy a seamless experience.
+          You are now logged in. Explore features, manage your schedule, and
+          enjoy a seamless experience.
         </p>
         <motion.button
           whileHover={{ scale: 1.05 }}
