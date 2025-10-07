@@ -4,9 +4,9 @@ const User = require("../models/User");
 module.exports = async (req, res, next) => {
   try {
     // Get token from header, query, or cookie
-    const token = 
-      req.headers.authorization?.split(" ")[1] || 
-      req.query.token || 
+    const token =
+      req.headers.authorization?.split(" ")[1] ||
+      req.query.token ||
       req.cookies?.token;
 
     if (!token) {
@@ -14,13 +14,13 @@ module.exports = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Find user from decoded token
     const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
-    
+
     // Add user data to request for use in controllers
     req.user = user;
     next();

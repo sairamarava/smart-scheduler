@@ -44,8 +44,12 @@ const Dashboard = ({ user }) => {
       setSearchResults(data.documents);
 
       // Extract unique subjects and colleges for filters
-      const allSubjects = [...new Set(data.documents.map(doc => doc.subject))];
-      const allColleges = [...new Set(data.documents.map(doc => doc.college))];
+      const allSubjects = [
+        ...new Set(data.documents.map((doc) => doc.subject)),
+      ];
+      const allColleges = [
+        ...new Set(data.documents.map((doc) => doc.college)),
+      ];
       setSubjects(allSubjects);
       setColleges(allColleges);
     } catch (error) {
@@ -70,12 +74,12 @@ const Dashboard = ({ user }) => {
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.document || formData.document.type !== "application/pdf") {
       setUploadError("Please select a PDF file");
       return;
     }
-    
+
     setIsUploading(true);
     setUploadError("");
 
@@ -145,7 +149,9 @@ const Dashboard = ({ user }) => {
           </h1>
           <div className="flex items-center space-x-4">
             <div className="hidden md:flex items-center space-x-2">
-              <span className="text-gray-700">Welcome, {user?.name || "User"}</span>
+              <span className="text-gray-700">
+                Welcome, {user?.name || "User"}
+              </span>
             </div>
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white font-bold text-lg">
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
@@ -214,7 +220,10 @@ const Dashboard = ({ user }) => {
             >
               {/* Search and Filters */}
               <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <form
+                  onSubmit={handleSearch}
+                  className="grid grid-cols-1 md:grid-cols-4 gap-4"
+                >
                   {/* Search input */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -228,7 +237,7 @@ const Dashboard = ({ user }) => {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                     />
                   </div>
-                  
+
                   {/* Subject filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -247,7 +256,7 @@ const Dashboard = ({ user }) => {
                       ))}
                     </select>
                   </div>
-                  
+
                   {/* College filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -266,7 +275,7 @@ const Dashboard = ({ user }) => {
                       ))}
                     </select>
                   </div>
-                  
+
                   {/* Buttons */}
                   <div className="md:col-span-4 flex items-center justify-end gap-4 mt-4">
                     <button
@@ -285,11 +294,13 @@ const Dashboard = ({ user }) => {
                   </div>
                 </form>
               </div>
-              
+
               {/* Document List */}
               <div className="bg-white rounded-xl shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">Available Documents</h2>
-                
+                <h2 className="text-xl font-semibold mb-4">
+                  Available Documents
+                </h2>
+
                 {documents.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     No documents found. Upload some documents to get started!
@@ -382,7 +393,7 @@ const Dashboard = ({ user }) => {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                     />
                   </div>
-                  
+
                   {/* Subject */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -398,7 +409,7 @@ const Dashboard = ({ user }) => {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                     />
                   </div>
-                  
+
                   {/* College */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -414,7 +425,7 @@ const Dashboard = ({ user }) => {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                     />
                   </div>
-                  
+
                   {/* File Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
