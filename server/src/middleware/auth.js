@@ -1,17 +1,31 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    // Get token from header, query, or cookie
+    const token = 
+      req.headers.authorization?.split(" ")[1] || 
+      req.query.token || 
+      req.cookies?.token;
 
     if (!token) {
-      return res.status(401).json({ error: "No token provided" });
+      return res.status(401).json({ error: "Authentication required" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
+    
+    // Find user from decoded token
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    
+    // Add user data to request for use in controllers
+    req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
+    console.error("Auth Error:", error.message);
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 };

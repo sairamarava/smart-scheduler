@@ -9,6 +9,7 @@ const path = require("path");
 
 // Routes
 const authRoutes = require("./routes/auth");
+const documentRoutes = require("./routes/documents");
 
 // Middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -29,8 +30,12 @@ app.use(
 app.use(helmet());
 app.use(compression());
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/documents", documentRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {
