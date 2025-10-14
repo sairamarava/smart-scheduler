@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+// Import our toggleable PDF viewer component
+import ToggleablePDFViewer from "./components/ToggleablePDFViewer";
 
 // Document category icon components
 const PDFIcon = () => (
@@ -102,10 +104,59 @@ const Dashboard = ({ user }) => {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedCollege, setSelectedCollege] = useState("");
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [starredDocuments, setStarredDocuments] = useState([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState("success"); // success, error, info
+  const [sortOption, setSortOption] = useState("createdAt-desc"); // Default: newest first
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [documentsPerPage] = useState(12); // How many documents to show per page
 
   useEffect(() => {
     fetchDocuments();
+    // Load starred documents from localStorage
+    const storedStarred = localStorage.getItem("starredDocuments");
+    if (storedStarred) {
+      setStarredDocuments(JSON.parse(storedStarred));
+    }
   }, []);
+
+  // Handle click outside of dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // Close sort dropdown if clicking outside
+      if (showSortDropdown && !e.target.closest(".sort-dropdown")) {
+        setShowSortDropdown(false);
+      }
+
+      // Close profile dropdown if clicking outside
+      if (showProfileDropdown && !e.target.closest(".profile-dropdown")) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSortDropdown, showProfileDropdown]);
+
+  // Show notification toast
+  const showToast = (message, type = "success") => {
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
 
   const fetchDocuments = async (query = "", subject = "", college = "") => {
     try {
@@ -123,7 +174,8 @@ const Dashboard = ({ user }) => {
 
       const data = await res.json();
       setDocuments(data.documents);
-      setSearchResults(data.documents);
+      // Apply sorting before setting searchResults
+      setSearchResults(sortDocuments(data.documents, sortOption));
 
       // Extract unique subjects and colleges for filters
       const allSubjects = [
@@ -138,7 +190,100 @@ const Dashboard = ({ user }) => {
       setColleges(allColleges);
     } catch (error) {
       console.error("Error fetching documents:", error);
+      showToast("Failed to load documents", "error");
     }
+  };
+
+  // Handle starring/favoriting documents
+  const handleToggleStar = (e, docId) => {
+    e.stopPropagation();
+
+    setStarredDocuments((prevStarred) => {
+      let newStarred;
+
+      if (prevStarred.includes(docId)) {
+        // Remove from starred
+        newStarred = prevStarred.filter((id) => id !== docId);
+        showToast("Removed from favorites");
+      } else {
+        // Add to starred
+        newStarred = [...prevStarred, docId];
+        showToast("Added to favorites");
+      }
+
+      // Save to localStorage
+      localStorage.setItem("starredDocuments", JSON.stringify(newStarred));
+      return newStarred;
+    });
+  };
+
+  // Handle document deletion
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch(`/api/documents/${documentToDelete._id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete document");
+      }
+
+      // Remove document from list
+      setDocuments((prevDocs) =>
+        prevDocs.filter((doc) => doc._id !== documentToDelete._id)
+      );
+
+      // Close confirmation modal
+      setShowDeleteConfirmation(false);
+      setDocumentToDelete(null);
+
+      // If the deleted document was selected, clear selection
+      if (selectedDocument && selectedDocument._id === documentToDelete._id) {
+        setSelectedDocument(null);
+      }
+
+      // Show success message
+      showToast("Document deleted successfully");
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      showToast(error.message || "Failed to delete document", "error");
+    }
+  };
+
+  // Handle sharing document
+  const handleShareDocument = (e, doc) => {
+    e.stopPropagation();
+
+    // Generate a share link (in a real app, you'd use a proper sharing API)
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/view/${doc._id}`;
+
+    setShareLink(shareUrl);
+    setShowShareModal(true);
+  };
+
+  // Copy share link to clipboard
+  const copyShareLink = () => {
+    navigator.clipboard
+      .writeText(shareLink)
+      .then(() => {
+        showToast("Link copied to clipboard");
+      })
+      .catch(() => {
+        showToast("Failed to copy link", "error");
+      });
+  };
+
+  // Preview document
+  const handlePreviewDocument = (e, doc) => {
+    e.stopPropagation();
+    setSelectedDocument(doc);
+    setShowPreviewModal(true);
   };
 
   const handleLogout = async () => {
@@ -209,6 +354,7 @@ const Dashboard = ({ user }) => {
   const handleSearch = (e) => {
     e.preventDefault();
     fetchDocuments(searchQuery, selectedSubject, selectedCollege);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleClearFilters = () => {
@@ -217,6 +363,7 @@ const Dashboard = ({ user }) => {
     setSelectedCollege("");
     setActiveView("all");
     fetchDocuments();
+    setCurrentPage(1); // Reset to first page when clearing filters
   };
 
   const handleDownload = async (id) => {
@@ -249,6 +396,55 @@ const Dashboard = ({ user }) => {
   const closeUploadModal = () => {
     setShowUploadModal(false);
   };
+
+  // Sort documents based on sort option
+  const sortDocuments = (docs, option) => {
+    const sortedDocs = [...docs];
+
+    switch (option) {
+      case "name-asc":
+        return sortedDocs.sort((a, b) => a.name.localeCompare(b.name));
+      case "name-desc":
+        return sortedDocs.sort((a, b) => b.name.localeCompare(a.name));
+      case "subject-asc":
+        return sortedDocs.sort((a, b) => a.subject.localeCompare(b.subject));
+      case "subject-desc":
+        return sortedDocs.sort((a, b) => b.subject.localeCompare(a.subject));
+      case "college-asc":
+        return sortedDocs.sort((a, b) => a.college.localeCompare(b.college));
+      case "college-desc":
+        return sortedDocs.sort((a, b) => b.college.localeCompare(a.college));
+      case "createdAt-desc":
+        return sortedDocs.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+      case "createdAt-asc":
+        return sortedDocs.sort(
+          (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        );
+      default:
+        return sortedDocs;
+    }
+  };
+
+  // Handle sorting change
+  const handleSortChange = (option) => {
+    setSortOption(option);
+    setShowSortDropdown(false);
+    setSearchResults(sortDocuments(searchResults, option));
+    setCurrentPage(1); // Reset to first page when changing sort
+  };
+
+  // Pagination logic
+  const indexOfLastDocument = currentPage * documentsPerPage;
+  const indexOfFirstDocument = indexOfLastDocument - documentsPerPage;
+  const currentDocuments = searchResults.slice(
+    indexOfFirstDocument,
+    indexOfLastDocument
+  );
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const totalPages = Math.ceil(searchResults.length / documentsPerPage);
 
   // Document selection handling
   const handleDocumentClick = (doc) => {
@@ -422,11 +618,12 @@ const Dashboard = ({ user }) => {
               {/* Right section - Actions and Profile */}
               <div className="flex items-center space-x-1 md:space-x-3">
                 {/* User profile dropdown */}
-                <div className="relative">
+                <div className="relative profile-dropdown">
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="flex items-center cursor-pointer"
+                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                   >
                     <div className="hidden md:block mr-3 text-right">
                       <p className="text-sm font-medium text-gray-700">
@@ -454,7 +651,9 @@ const Dashboard = ({ user }) => {
                       </div>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 text-gray-500 ml-1"
+                        className={`h-4 w-4 text-gray-500 ml-1 transition-transform duration-200 ${
+                          showProfileDropdown ? "rotate-180" : ""
+                        }`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -468,6 +667,112 @@ const Dashboard = ({ user }) => {
                       </svg>
                     </div>
                   </motion.div>
+
+                  {/* Profile Dropdown Menu */}
+                  <AnimatePresence>
+                    {showProfileDropdown && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100"
+                      >
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Signed in as
+                          </p>
+                          <p className="text-sm text-gray-600 truncate">
+                            {user?.email || "user@example.com"}
+                          </p>
+                        </div>
+
+                        <div className="py-1">
+                          <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 mr-3 text-gray-500"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
+                            </svg>
+                            Profile Settings
+                          </button>
+
+                          <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 mr-3 text-gray-500"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                            Account Settings
+                          </button>
+
+                          <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 flex items-center">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 mr-3 text-gray-500"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            Help &amp; Support
+                          </button>
+                        </div>
+
+                        <div className="py-1 border-t border-gray-100">
+                          <button
+                            onClick={handleLogout}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4 mr-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                              />
+                            </svg>
+                            Sign out
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Logout button */}
@@ -599,7 +904,10 @@ const Dashboard = ({ user }) => {
                     <ul className="space-y-1.5">
                       <li>
                         <motion.button
-                          onClick={() => setActiveView("all")}
+                          onClick={() => {
+                            setActiveView("all");
+                            setCurrentPage(1);
+                          }}
                           whileHover={{ x: 3 }}
                           whileTap={{ scale: 0.97 }}
                           className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -652,6 +960,7 @@ const Dashboard = ({ user }) => {
                           onClick={() => {
                             setActiveView("recent");
                             fetchDocuments();
+                            setCurrentPage(1);
                           }}
                           whileHover={{ x: 3 }}
                           whileTap={{ scale: 0.97 }}
@@ -693,15 +1002,42 @@ const Dashboard = ({ user }) => {
 
                       <li>
                         <motion.button
+                          onClick={() => {
+                            setActiveView("starred");
+                            // Filter documents to show only starred ones
+                            const starredDocs = documents.filter((doc) =>
+                              starredDocuments.includes(doc._id)
+                            );
+                            setSearchResults(starredDocs);
+                            setCurrentPage(1);
+                          }}
                           whileHover={{ x: 3 }}
                           whileTap={{ scale: 0.97 }}
-                          className="w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-gray-700 hover:bg-blue-50"
+                          className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            activeView === "starred"
+                              ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md"
+                              : "text-gray-700 hover:bg-blue-50"
+                          }`}
                         >
-                          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-yellow-100">
+                          <div
+                            className={`flex items-center justify-center w-8 h-8 rounded-lg ${
+                              activeView === "starred"
+                                ? "bg-blue-400 bg-opacity-30"
+                                : "bg-yellow-100"
+                            }`}
+                          >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5 text-yellow-600"
-                              fill="none"
+                              className={`h-5 w-5 ${
+                                activeView === "starred"
+                                  ? "text-white"
+                                  : "text-yellow-600"
+                              }`}
+                              fill={
+                                activeView === "starred"
+                                  ? "currentColor"
+                                  : "none"
+                              }
                               viewBox="0 0 24 24"
                               stroke="currentColor"
                             >
@@ -714,6 +1050,15 @@ const Dashboard = ({ user }) => {
                             </svg>
                           </div>
                           <span className="ml-3">Starred</span>
+                          <span
+                            className={`ml-auto px-2 py-0.5 rounded-full text-xs ${
+                              activeView === "starred"
+                                ? "bg-white bg-opacity-30 text-white"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {starredDocuments.length}
+                          </span>
                         </motion.button>
                       </li>
                     </ul>
@@ -790,6 +1135,7 @@ const Dashboard = ({ user }) => {
                                 setSelectedSubject(subject);
                                 setActiveView("subject");
                                 fetchDocuments("", subject, "");
+                                setCurrentPage(1);
                               }}
                               whileHover={{ x: 3 }}
                               whileTap={{ scale: 0.97 }}
@@ -929,6 +1275,7 @@ const Dashboard = ({ user }) => {
                                 setSelectedCollege(college);
                                 setActiveView("college");
                                 fetchDocuments("", "", college);
+                                setCurrentPage(1);
                               }}
                               whileHover={{ x: 3 }}
                               whileTap={{ scale: 0.97 }}
@@ -1390,10 +1737,11 @@ const Dashboard = ({ user }) => {
               </div>
 
               {/* Sort dropdown button */}
-              <div className="relative">
+              <div className="relative sort-dropdown">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
                   className="h-10 px-3 flex items-center text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50"
                 >
                   <svg
@@ -1410,10 +1758,19 @@ const Dashboard = ({ user }) => {
                       d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
                     />
                   </svg>
-                  Date Added
+                  {sortOption === "name-asc" && "Name (A-Z)"}
+                  {sortOption === "name-desc" && "Name (Z-A)"}
+                  {sortOption === "subject-asc" && "Subject (A-Z)"}
+                  {sortOption === "subject-desc" && "Subject (Z-A)"}
+                  {sortOption === "college-asc" && "College (A-Z)"}
+                  {sortOption === "college-desc" && "College (Z-A)"}
+                  {sortOption === "createdAt-desc" && "Date (Newest)"}
+                  {sortOption === "createdAt-asc" && "Date (Oldest)"}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 ml-1"
+                    className={`h-4 w-4 ml-1 transition-transform duration-200 ${
+                      showSortDropdown ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1426,6 +1783,221 @@ const Dashboard = ({ user }) => {
                     />
                   </svg>
                 </motion.button>
+
+                {/* Sort dropdown menu */}
+                <AnimatePresence>
+                  {showSortDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100"
+                    >
+                      <h3 className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                        Sort by
+                      </h3>
+                      <div className="py-1">
+                        <button
+                          onClick={() => handleSortChange("name-asc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "name-asc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Name (A-Z)</span>
+                          {sortOption === "name-asc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("name-desc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "name-desc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Name (Z-A)</span>
+                          {sortOption === "name-desc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleSortChange("subject-asc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "subject-asc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Subject (A-Z)</span>
+                          {sortOption === "subject-asc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("subject-desc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "subject-desc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Subject (Z-A)</span>
+                          {sortOption === "subject-desc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleSortChange("college-asc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "college-asc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>College (A-Z)</span>
+                          {sortOption === "college-asc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("college-desc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "college-desc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>College (Z-A)</span>
+                          {sortOption === "college-desc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+
+                        <div className="border-t border-gray-100 my-1"></div>
+
+                        <button
+                          onClick={() => handleSortChange("createdAt-desc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "createdAt-desc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Date (Newest first)</span>
+                          {sortOption === "createdAt-desc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleSortChange("createdAt-asc")}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between ${
+                            sortOption === "createdAt-asc"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span>Date (Oldest first)</span>
+                          {sortOption === "createdAt-asc" && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </div>
@@ -1506,7 +2078,7 @@ const Dashboard = ({ user }) => {
             >
               {/* Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-                {documents.map((doc, index) => (
+                {currentDocuments.map((doc, index) => (
                   <motion.div
                     key={doc._id}
                     initial={{ opacity: 0, y: 20 }}
@@ -1590,10 +2162,40 @@ const Dashboard = ({ user }) => {
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm text-gray-600 hover:text-gray-800"
+                          className={`w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm ${
+                            starredDocuments.includes(doc._id)
+                              ? "text-yellow-500"
+                              : "text-gray-600 hover:text-gray-800"
+                          }`}
+                          onClick={(e) => handleToggleStar(e, doc._id)}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill={
+                              starredDocuments.includes(doc._id)
+                                ? "currentColor"
+                                : "none"
+                            }
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                          </svg>
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="w-7 h-7 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-sm text-gray-600 hover:text-red-600"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Star functionality could be added here
+                            setDocumentToDelete(doc);
+                            setShowDeleteConfirmation(true);
                           }}
                         >
                           <svg
@@ -1607,7 +2209,7 @@ const Dashboard = ({ user }) => {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
                         </motion.button>
@@ -1711,10 +2313,7 @@ const Dashboard = ({ user }) => {
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Share functionality could be added here
-                          }}
+                          onClick={(e) => handleShareDocument(e, doc)}
                           className="p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                           title="Share document"
                         >
@@ -1730,6 +2329,35 @@ const Dashboard = ({ user }) => {
                               strokeLinejoin="round"
                               strokeWidth={2}
                               d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                            />
+                          </svg>
+                        </motion.button>
+
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => handlePreviewDocument(e, doc)}
+                          className="p-1.5 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200"
+                          title="Preview document"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                             />
                           </svg>
                         </motion.button>
@@ -1766,14 +2394,28 @@ const Dashboard = ({ user }) => {
               </div>
 
               {/* Pagination control at bottom */}
-              {documents.length > 0 && (
+              {searchResults.length > 0 && (
                 <div className="mt-10 flex justify-between items-center">
                   <p className="text-sm text-gray-500">
-                    Showing {documents.length} results
+                    Showing {indexOfFirstDocument + 1}-
+                    {Math.min(indexOfLastDocument, searchResults.length)} of{" "}
+                    {searchResults.length} results
                   </p>
 
                   <div className="flex space-x-1">
-                    <button className="px-3 py-1 rounded-md bg-white border border-gray-200 text-gray-400">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() =>
+                        currentPage > 1 && paginate(currentPage - 1)
+                      }
+                      disabled={currentPage === 1}
+                      className={`px-3 py-1 rounded-md ${
+                        currentPage === 1
+                          ? "bg-white border border-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -1788,14 +2430,50 @@ const Dashboard = ({ user }) => {
                           d="M15 19l-7-7 7-7"
                         />
                       </svg>
-                    </button>
-                    <button className="px-3 py-1 rounded-md bg-blue-600 text-white">
-                      1
-                    </button>
-                    <button className="px-3 py-1 rounded-md bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">
-                      2
-                    </button>
-                    <button className="px-3 py-1 rounded-md bg-white border border-gray-200 text-gray-400">
+                    </motion.button>
+
+                    {/* Render pagination numbers with logic for many pages */}
+                    {Array.from({ length: totalPages })
+                      .slice(
+                        Math.max(0, Math.min(currentPage - 3, totalPages - 5)),
+                        Math.max(5, Math.min(currentPage + 2, totalPages))
+                      )
+                      .map((_, index) => {
+                        const pageNumber =
+                          Math.max(
+                            1,
+                            Math.min(currentPage - 2, totalPages - 4)
+                          ) + index;
+                        return (
+                          <motion.button
+                            key={pageNumber}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => paginate(pageNumber)}
+                            className={`px-3 py-1 rounded-md ${
+                              currentPage === pageNumber
+                                ? "bg-blue-600 text-white"
+                                : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {pageNumber}
+                          </motion.button>
+                        );
+                      })}
+
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() =>
+                        currentPage < totalPages && paginate(currentPage + 1)
+                      }
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-1 rounded-md ${
+                        currentPage === totalPages
+                          ? "bg-white border border-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
@@ -1810,7 +2488,7 @@ const Dashboard = ({ user }) => {
                           d="M9 5l7 7-7 7"
                         />
                       </svg>
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               )}
@@ -2250,6 +2928,457 @@ const Dashboard = ({ user }) => {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: -20, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-8 w-8 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Delete Document
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Are you sure you want to delete{" "}
+                  <span className="font-medium text-gray-900">
+                    "{documentToDelete?.name}"
+                  </span>
+                  ? This action cannot be undone.
+                </p>
+
+                <div className="flex items-center justify-center space-x-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg"
+                    onClick={() => {
+                      setShowDeleteConfirmation(false);
+                      setDocumentToDelete(null);
+                    }}
+                  >
+                    Cancel
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-sm"
+                    onClick={handleDeleteDocument}
+                  >
+                    Delete
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Document Preview Modal */}
+      <AnimatePresence>
+        {showPreviewModal && selectedDocument && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-lg mr-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-red-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M14 3v4a2 2 0 002 2h4"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900 leading-tight">
+                      {selectedDocument.name}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {selectedDocument.subject} • {selectedDocument.college}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleDownload(selectedDocument._id)}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-blue-600"
+                    title="Download"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                  </button>
+                  <motion.button
+                    whileHover={{ rotate: 90 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                    onClick={() => setShowPreviewModal(false)}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* PDF Preview */}
+              <div className="flex-1 bg-gray-100 p-2 overflow-hidden">
+                <div className="w-full h-full bg-white rounded-lg shadow-inner overflow-hidden">
+                  {selectedDocument && (
+                    <ToggleablePDFViewer documentId={selectedDocument._id} />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Share Modal */}
+      <AnimatePresence>
+        {showShareModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: -20, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 text-blue-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                        />
+                      </svg>
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900">
+                      Share Document
+                    </h2>
+                  </div>
+                  <motion.button
+                    whileHover={{ rotate: 90 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                    onClick={() => setShowShareModal(false)}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Share link
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      value={shareLink}
+                      readOnly
+                      className="flex-1 p-3 border border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={copyShareLink}
+                      className="flex items-center justify-center h-12 px-4 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </motion.button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Anyone with this link can view the document
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Share with teammates
+                  </h3>
+
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 mr-3 overflow-hidden border border-white">
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-indigo-500 text-white font-medium text-sm">
+                          {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                        </div>
+                      </div>
+                      <span className="text-sm text-gray-800">
+                        {user?.email || "you@example.com"}
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                      Owner
+                    </span>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const email = e.target.email.value;
+                      if (!email) return;
+
+                      // In a real app, this would send an API request
+                      // For now we'll just show a toast notification
+                      showToast(`Invitation sent to ${email}`, "success");
+                      e.target.reset();
+                    }}
+                  >
+                    <div className="relative mt-4">
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Enter email address"
+                        className="w-full p-3 pr-24 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="absolute right-1 top-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button className="flex items-center px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                        />
+                      </svg>
+                      <span>Share on Slack</span>
+                    </button>
+                    <button className="flex items-center px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                        />
+                      </svg>
+                      <span>Share via Teams</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center ${
+              notificationType === "success"
+                ? "bg-green-500"
+                : notificationType === "error"
+                ? "bg-red-500"
+                : "bg-blue-500"
+            }`}
+          >
+            <div
+              className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                notificationType === "success"
+                  ? "bg-green-400"
+                  : notificationType === "error"
+                  ? "bg-red-400"
+                  : "bg-blue-400"
+              }`}
+            >
+              {notificationType === "success" && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 text-white"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+              {notificationType === "error" && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 text-white"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+              {notificationType === "info" && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 text-white"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2h2a1 1 0 100-2H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+            <span className="ml-3 text-white font-medium">
+              {notificationMessage}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

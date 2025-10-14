@@ -67,7 +67,7 @@ router.post(
         filePath: req.file.path,
         fileType: req.file.mimetype,
         fileSize: req.file.size,
-        uploadedBy: req.user.id,
+        uploadedBy: req.userId, // Use userId from the middleware
       });
 
       await newDocument.save();
@@ -162,7 +162,7 @@ router.delete("/:id", auth, async (req, res, next) => {
     }
 
     // Check if user is the owner
-    if (document.uploadedBy.toString() !== req.user.id) {
+    if (document.uploadedBy.toString() !== req.userId.toString()) {
       return res
         .status(403)
         .json({ error: "You are not authorized to delete this document" });
@@ -172,6 +172,8 @@ router.delete("/:id", auth, async (req, res, next) => {
     fs.unlink(document.filePath, async (err) => {
       if (err) {
         console.error("Error deleting file:", err);
+        // Continue with deletion from database even if file deletion fails
+        // This prevents orphaned database records if the file is already gone
       }
 
       // Delete document from database

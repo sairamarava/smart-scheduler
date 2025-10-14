@@ -23,6 +23,7 @@ module.exports = async (req, res, next) => {
 
     // Add user data to request for use in controllers
     req.user = user;
+    req.userId = user._id; // Add userId directly for convenience
     next();
   } catch (error) {
     console.error("Auth Error:", error.message);
