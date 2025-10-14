@@ -1,34 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 
 /**
  * A simple PDF viewer component that uses the browser's built-in PDF rendering capabilities
  * and provides a fallback for browsers that don't support it.
  */
 const SimplePDFViewer = ({ documentId }) => {
-  const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfUrl, setPdfUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const iframeRef = useRef(null);
 
   useEffect(() => {
     if (!documentId) {
-      setError('No document ID provided');
+      setError("No document ID provided");
       setLoading(false);
       return;
     }
 
     try {
       // Get the access token from localStorage
-      const token = localStorage.getItem('accessToken');
-      
+      const token = localStorage.getItem("accessToken");
+
       // Set the PDF URL including the token for authentication
       const url = `/api/documents/${documentId}/download?token=${token}`;
       setPdfUrl(url);
       setLoading(false);
     } catch (err) {
-      console.error('Error setting up PDF viewer:', err);
-      setError('Failed to set up PDF viewer');
+      console.error("Error setting up PDF viewer:", err);
+      setError("Failed to set up PDF viewer");
       setLoading(false);
     }
   }, [documentId]);
@@ -40,7 +40,7 @@ const SimplePDFViewer = ({ documentId }) => {
 
   // Handle iframe error event
   const handleIframeError = () => {
-    setError('Failed to load PDF in the viewer');
+    setError("Failed to load PDF in the viewer");
     setLoading(false);
   };
 
@@ -70,7 +70,7 @@ const SimplePDFViewer = ({ documentId }) => {
           {error}
         </p>
         {pdfUrl && (
-          <a 
+          <a
             href={pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -90,9 +90,9 @@ const SimplePDFViewer = ({ documentId }) => {
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-gray-700">PDF Viewer</span>
         </div>
-        
+
         {pdfUrl && (
-          <a 
+          <a
             href={pdfUrl}
             download
             className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
@@ -101,7 +101,7 @@ const SimplePDFViewer = ({ documentId }) => {
           </a>
         )}
       </div>
-      
+
       {/* PDF Document */}
       <div className="flex-1 overflow-hidden bg-gray-200 flex justify-center">
         {loading ? (
