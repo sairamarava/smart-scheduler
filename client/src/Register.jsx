@@ -32,7 +32,8 @@ const Register = () => {
           // body might be JSON or text
           if (typeof err.body === "string") setError(err.body);
           else if (err.body.error) setError(err.body.error);
-          else if (err.body.errors) setError(err.body.errors.map(e => e.msg).join("; "));
+          else if (err.body.errors)
+            setError(err.body.errors.map((e) => e.msg).join("; "));
           else setError(JSON.stringify(err.body));
         } catch (e) {
           setError("Registration failed");

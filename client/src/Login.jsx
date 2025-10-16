@@ -30,13 +30,17 @@ const Login = () => {
       if (err && err.body) {
         try {
           if (err.body.error) setError(err.body.error);
-          else if (err.body.errors) setError(err.body.errors.map(e => e.msg).join('; '));
-          else setError(typeof err.body === 'string' ? err.body : JSON.stringify(err.body));
+          else if (err.body.errors)
+            setError(err.body.errors.map((e) => e.msg).join("; "));
+          else
+            setError(
+              typeof err.body === "string" ? err.body : JSON.stringify(err.body)
+            );
         } catch {
-          setError('Login failed');
+          setError("Login failed");
         }
       } else {
-        setError(err.message || 'Login failed');
+        setError(err.message || "Login failed");
       }
     } finally {
       setLoading(false);

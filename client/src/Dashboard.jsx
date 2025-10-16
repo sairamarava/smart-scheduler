@@ -374,10 +374,12 @@ const Dashboard = ({ user }) => {
         console.log(`Downloading: ${doc.name}`);
       }
 
-  // Use API_BASE in case VITE_API_URL is set (ensures we hit backend, not the SPA)
-  const { API_BASE } = await import("./utils/api");
-  const downloadUrl = `${API_BASE || ''}/api/documents/${id}/download?token=${token}`;
-  window.open(downloadUrl, "_blank");
+      // Use API_BASE in case VITE_API_URL is set (ensures we hit backend, not the SPA)
+      const { API_BASE } = await import("./utils/api");
+      const downloadUrl = `${
+        API_BASE || ""
+      }/api/documents/${id}/download?token=${token}`;
+      window.open(downloadUrl, "_blank");
     } catch (error) {
       console.error("Error downloading document:", error);
     }
