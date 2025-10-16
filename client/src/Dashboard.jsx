@@ -166,13 +166,13 @@ const Dashboard = ({ user }) => {
       if (college) url += `college=${encodeURIComponent(college)}&`;
 
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(url, {
+      const { apiFetch } = await import("./utils/api");
+
+      // apiFetch will route through VITE_API_URL when set and throw structured errors
+      const data = await apiFetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch documents");
-
-      const data = await res.json();
       setDocuments(data.documents);
       // Apply sorting before setting searchResults
       setSearchResults(sortDocuments(data.documents, sortOption));
@@ -189,7 +189,12 @@ const Dashboard = ({ user }) => {
       setSubjects(allSubjects);
       setColleges(allColleges);
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      // apiFetch throws { status, body } for non-2xx; surface useful messages
+      if (error && error.body) {
+        console.error("Error fetching documents (body):", error.body);
+      } else {
+        console.error("Error fetching documents:", error);
+      }
       showToast("Failed to load documents", "error");
     }
   };
