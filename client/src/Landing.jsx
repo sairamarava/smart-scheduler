@@ -10,13 +10,14 @@ const Landing = () => {
     const fetchUser = async () => {
       const token = localStorage.getItem("accessToken");
       if (!token) return;
-      const res = await fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const { apiFetch } = await import("./utils/api");
+      try {
+        const data = await apiFetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setUser(data);
+      } catch (err) {
+        // ignore; user will remain null
       }
     };
     fetchUser();

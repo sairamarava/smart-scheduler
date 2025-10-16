@@ -27,12 +27,15 @@ const PDFViewer = ({ documentId }) => {
   useEffect(() => {
     if (!documentId) return;
 
-    // Get the access token from localStorage
+    // Get the access token from localStorage and build URL using API_BASE
     const token = localStorage.getItem("accessToken");
 
-    // Set the PDF URL including the token for authentication
-    const url = `/api/documents/${documentId}/download?token=${token}`;
-    setPdfUrl(url);
+    (async () => {
+      const { API_BASE } = await import("../utils/api");
+      const base = API_BASE || "";
+      const url = `${base}/api/documents/${documentId}/download?token=${token}`;
+      setPdfUrl(url);
+    })();
 
     // Reset error state when document ID changes
     setError(null);

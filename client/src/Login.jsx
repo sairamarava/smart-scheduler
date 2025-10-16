@@ -18,17 +18,26 @@ const Login = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const { apiFetch } = await import("./utils/api");
+      const data = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
       localStorage.setItem("accessToken", data.accessToken);
       navigate("/landing");
     } catch (err) {
-      setError(err.message);
+      if (err && err.body) {
+        try {
+          if (err.body.error) setError(err.body.error);
+          else if (err.body.errors) setError(err.body.errors.map(e => e.msg).join('; '));
+          else setError(typeof err.body === 'string' ? err.body : JSON.stringify(err.body));
+        } catch {
+          setError('Login failed');
+        }
+      } else {
+        setError(err.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }

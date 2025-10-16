@@ -22,10 +22,13 @@ const SimplePDFViewer = ({ documentId }) => {
       // Get the access token from localStorage
       const token = localStorage.getItem("accessToken");
 
-      // Set the PDF URL including the token for authentication
-      const url = `/api/documents/${documentId}/download?token=${token}`;
-      setPdfUrl(url);
-      setLoading(false);
+      (async () => {
+        const { API_BASE } = await import("../utils/api");
+        const base = API_BASE || "";
+        const url = `${base}/api/documents/${documentId}/download?token=${token}`;
+        setPdfUrl(url);
+        setLoading(false);
+      })();
     } catch (err) {
       console.error("Error setting up PDF viewer:", err);
       setError("Failed to set up PDF viewer");

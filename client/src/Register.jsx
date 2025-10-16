@@ -18,16 +18,28 @@ const Register = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/register", {
+      const { apiFetch } = await import("./utils/api");
+      await apiFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Registration failed");
       navigate("/login");
     } catch (err) {
-      setError(err.message);
+      // err may be an object thrown by apiFetch: { status, body }
+      if (err && err.body) {
+        try {
+          // body might be JSON or text
+          if (typeof err.body === "string") setError(err.body);
+          else if (err.body.error) setError(err.body.error);
+          else if (err.body.errors) setError(err.body.errors.map(e => e.msg).join("; "));
+          else setError(JSON.stringify(err.body));
+        } catch (e) {
+          setError("Registration failed");
+        }
+      } else {
+        setError(err.message || "Registration failed");
+      }
     } finally {
       setLoading(false);
     }

@@ -223,15 +223,11 @@ const Dashboard = ({ user }) => {
 
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(`/api/documents/${documentToDelete._id}`, {
+      const { apiFetch } = await import("./utils/api");
+      await apiFetch(`/api/documents/${documentToDelete._id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to delete document");
-      }
 
       // Remove document from list
       setDocuments((prevDocs) =>
@@ -287,7 +283,12 @@ const Dashboard = ({ user }) => {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    try {
+      const { apiFetch } = await import("./utils/api");
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      // ignore logout errors
+    }
     localStorage.removeItem("accessToken");
     navigate("/");
   };
@@ -322,16 +323,12 @@ const Dashboard = ({ user }) => {
       data.append("document", formData.document);
 
       const token = localStorage.getItem("accessToken");
-      const res = await fetch("/api/documents/upload", {
+      const { apiFetch } = await import("./utils/api");
+      await apiFetch("/api/documents/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: data,
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to upload document");
-      }
 
       // Reset form and fetch updated documents
       setFormData({ name: "", subject: "", college: "", document: null });
@@ -377,7 +374,10 @@ const Dashboard = ({ user }) => {
         console.log(`Downloading: ${doc.name}`);
       }
 
-      window.open(`/api/documents/${id}/download?token=${token}`, "_blank");
+  // Use API_BASE in case VITE_API_URL is set (ensures we hit backend, not the SPA)
+  const { API_BASE } = await import("./utils/api");
+  const downloadUrl = `${API_BASE || ''}/api/documents/${id}/download?token=${token}`;
+  window.open(downloadUrl, "_blank");
     } catch (error) {
       console.error("Error downloading document:", error);
     }
